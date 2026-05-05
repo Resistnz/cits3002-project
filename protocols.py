@@ -1,25 +1,97 @@
-class DataLinkLayer():
-    def __init__(self):
-        self.destination_mac : str = None
-        self.source_mac : str = None
-        self.type : int = None
-        self.payload : NetworkLayer = None
+# --- Header Definitions ---
 
-class NetworkLayer():
-    def __init__(self):
-        self.destination_ip : str = None
-        self.source_ip : str = None
-        self.ttl : int = None
-        self.protocol : int = None
-        self.total_length : int = None
-        self.payload : TransportLayer = None
+class L4Segment:
+    """Represents a Transport Layer (UDP-like) Segment."""
+    def __init__(self, src_port: int, dst_port: int, seq_num: int, is_ack: bool, data: str, checksum: int = 0):
+        self.src_port = src_port
+        self.dst_port = dst_port
+        self.seq_num = seq_num
+        self.is_ack = is_ack
+        self.data = data
+        self.checksum = checksum
+        self.length = len(self.data) + 8 # Example header size
 
-class TransportLayer():
-    def __init__(self):
-        self.source_port : int = None
-        self.destination_port : int = None
-        self.length : int = None
-        self.checksum : int = None
-        self.type : int = None
-        self.sequence_number : int = None
-        self.data : str = None
+class L3Packet:
+    """Represents a Network Layer (IP-like) Packet."""
+    def __init__(self, src_ip: str, dst_ip: str, payload: L4Segment, ttl: int = 100):
+        self.src_ip = src_ip
+        self.dst_ip = dst_ip
+        self.ttl = ttl
+        self.payload = payload
+
+class L2Frame:
+    """Represents a Data Link Layer (Ethernet-like) Frame."""
+    def __init__(self, src_mac: str, dst_mac: str, payload: L3Packet):
+        self.src_mac = src_mac
+        self.dst_mac = dst_mac
+        self.payload = payload
+
+# --- Layer Implementations ---
+
+class TransportLayer:
+    """Layer 4: Handles port delivery, segmentation, checksums, and rdt2.2."""
+    def __init__(self, host_name: str, network_layer):
+        self.host_name = host_name
+        self.network_layer = network_layer
+        self.seq_num = 0  # rdt2.2 state (0 or 1)
+        self.expected_seq_num = 0
+
+    def receive_from_application(self, data: str, dest_ip: str):
+        """Chunks data into 500-byte max segments, applies rdt2.2 transmission."""
+        pass
+
+    def send_segment(self, segment: L4Segment, dest_ip: str):
+        """Computes checksum, encapsulates, and sends to Layer 3."""
+        pass
+
+    def receive_from_network(self, segment: L4Segment, src_ip: str):
+        """Verifies checksum, processes ACK or DATA, and sends to App or retransmits."""
+        pass
+
+    def _compute_checksum(self, data: str) -> int:
+        """Calculates a simple checksum for error detection."""
+        pass
+
+    def _verify_checksum(self, segment: L4Segment) -> bool:
+        """Validates the segment against its checksum."""
+        pass
+
+class NetworkLayer:
+    """Layer 3: Handles IP routing, TTL, and logical forwarding."""
+    def __init__(self, device_name: str, routing_table: dict, datalink_layer):
+        self.device_name = device_name
+        self.routing_table = routing_table
+        self.datalink_layer = datalink_layer
+        self.transport_layer = None # Linked if device is a Host
+
+    def receive_from_transport(self, segment: L4Segment, src_ip: str, dst_ip: str):
+        """Encapsulates segment into L3Packet and performs routing."""
+        pass
+
+    def receive_from_datalink(self, packet: L3Packet, interface: int):
+        """Decrements TTL, drops if 0. Checks if local delivery or needs forwarding."""
+        pass
+
+    def _route_packet(self, packet: L3Packet):
+        """Looks up dst_ip in routing_table, determines next-hop and interface."""
+        pass
+
+class DataLinkLayer:
+    """Layer 2: Handles MAC learning, framing, and physical forwarding."""
+    def __init__(self, device_name: str, interfaces: dict):
+        self.device_name = device_name
+        self.interfaces = interfaces # Map of interface_id -> physical_link
+        self.mac_table = {}          # Map of Next_Hop_IP -> MAC (Simplified ARP)
+        self.network_layer = None
+
+    def receive_from_network(self, packet: L3Packet, next_hop_ip: str, interface: int):
+        """Looks up destination MAC, creates frame, and transmits on interface."""
+        pass
+
+    def receive_from_physical(self, frame: L2Frame, interface: int):
+        """Learns source MAC, decapsulates, and delivers to Network Layer."""
+        pass
+
+    def _forward_frame(self, frame: L2Frame, interface: int):
+        """Pushes the frame onto the simulated physical link."""
+        pass
