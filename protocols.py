@@ -36,8 +36,15 @@ class TransportLayer:
         self.seq_num = 0  # rdt2.2 state (0 or 1)
         self.expected_seq_num = 0
 
+    def log(self, message: str):
+        print(f"{self.host_name} Layer 4: {message}")
+
     def receive_from_application(self, data: str, dest_ip: str):
         """Chunks data into 500-byte max segments, applies rdt2.2 transmission."""
+
+        # TODO: Data chunking
+
+        self.log(f"Received from Application Layer. Data size={len(data)}")
 
         segment = L4Segment(src_port=12345, dst_port=80, seq_num=self.seq_num, is_ack=False, data=data)
         self.send_segment(segment, dest_ip)
@@ -46,6 +53,11 @@ class TransportLayer:
         """Computes checksum, encapsulates, and sends to Layer 3."""
 
         segment.checksum = self._compute_checksum(segment.data)
+
+        self.log(f"Checksum computed")
+        self.log(f"Segment created by adding transport layer header (DATA,seq={segment.seq_num}) (encapsulation)")
+        self.log(f"Segment sent to Network Layer")
+
         self.network_layer.receive_from_transport(segment, self.host_name, dest_ip)
 
     def receive_from_network(self, segment: L4Segment, src_ip: str):
@@ -75,8 +87,13 @@ class NetworkLayer:
         self.datalink_layer = datalink_layer
         self.transport_layer = None # Linked if device is a Host
 
+    def log(self, message: str):
+        print(f"{self.device_name} Layer 3: {message}")
+
     def receive_from_transport(self, segment: L4Segment, src_ip: str, dst_ip: str):
         """Encapsulates segment into L3Packet and performs routing."""
+
+        self.log(f"Segment received from Transport Layer. SRC_IP={src_ip}, DST_IP={dst_ip}, TTL=100")
 
         packet = L3Packet(src_ip=src_ip, dst_ip=dst_ip, payload=segment)
         self._route_packet(packet)
@@ -101,9 +118,16 @@ class NetworkLayer:
         """Looks up dst_ip in routing_table, determines next-hop and interface."""
 
         dest_ip = packet.dst_ip
-        if dest_ip in self.routing_table:
-            next_hop_ip, interface = self.routing_table[dest_ip]
-            self.datalink_layer.receive_from_network(packet, next_hop_ip, interface)
+
+        self.log("Destination IP read: " + dest_ip)
+
+        next_hop_ip, interface = self.routing_table[dest_ip]
+
+        self.log("Routing table lookup performed")
+        self.log("Next-hop IP determined: " + next_hop_ip)
+
+        self.log("Packet forwarded to Data Link Layer")
+        self.datalink_layer.receive_from_network(packet, next_hop_ip, interface)
 
         pass
 
@@ -115,14 +139,23 @@ class DataLinkLayer:
         self.mac_table = {}          # Map of Next_Hop_IP -> MAC (Simplified ARP)
         self.network_layer = None
 
+    def log(self, message: str):
+        print(f"{self.device_name} Layer 2: {message}")
+
     def receive_from_network(self, packet: L3Packet, next_hop_ip: str, interface: int):
         """Looks up destination MAC, creates frame, and transmits on interface."""
 
-        if next_hop_ip in self.mac_table:
-            dst_mac = self.mac_table[next_hop_ip]
+        self.log(f"Packet recieved from Network Layer")
 
-            frame = L2Frame(src_mac=self.interfaces[interface].device1.mac, dst_mac=dst_mac, payload=packet)
-            self.interfaces[interface].transmit(frame, self.device_name)
+        dst_mac = self.mac_table[next_hop_ip]
+
+        self.log(f"Destination MAC lookup for next-hop IP ({next_hop_ip}) → {dst_mac}")
+
+        frame = L2Frame(src_mac=self.interfaces[interface].device1.mac, dst_mac=dst_mac, payload=packet)
+
+        self.log(f"Frame Created: SRC_MAC={frame.src_mac}, DST_MAC={frame.dst_mac}")
+
+        self.interfaces[interface].transmit(frame, self.device_name)
 
         pass
 
