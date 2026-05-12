@@ -42,19 +42,22 @@ class TransportLayer:
         segment = L4Segment(src_port=12345, dst_port=80, seq_num=self.seq_num, is_ack=False, data=data)
         self.send_segment(segment, dest_ip)
 
-        pass
-
     def send_segment(self, segment: L4Segment, dest_ip: str):
         """Computes checksum, encapsulates, and sends to Layer 3."""
 
         segment.checksum = self._compute_checksum(segment.data)
         self.network_layer.receive_from_transport(segment, self.host_name, dest_ip)
 
-        pass
-
     def receive_from_network(self, segment: L4Segment, src_ip: str):
         """Verifies checksum, processes ACK or DATA, and sends to App or retransmits."""
-        pass
+
+        if not self._verify_checksum(segment):
+            # Checksum failed, ignore segment
+            return
+        
+        # TODO: ACK
+
+        print(segment.data)
 
     def _compute_checksum(self, data: str) -> int:
         """Calculates a simple checksum for error detection."""
@@ -82,6 +85,16 @@ class NetworkLayer:
 
     def receive_from_datalink(self, packet: L3Packet, interface: int):
         """Decrements TTL, drops if 0. Checks if local delivery or needs forwarding."""
+
+        packet.ttl -= 1
+        if packet.ttl <= 0:
+            return
+        
+        if packet.dst_ip == self.device_name:
+            self.transport_layer.receive_from_network(packet.payload, packet.src_ip)
+        else:
+            self._route_packet(packet)
+
         pass
 
     def _route_packet(self, packet: L3Packet):
@@ -119,8 +132,4 @@ class DataLinkLayer:
         self.mac_table[frame.src_mac] = frame.src_mac
         self.network_layer.receive_from_datalink(frame.payload, interface)
 
-        pass
-
-    def _forward_frame(self, frame: L2Frame, interface: int):
-        """Pushes the frame onto the simulated physical link."""
         pass

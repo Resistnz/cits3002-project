@@ -7,9 +7,9 @@ def setup_network():
     Initializes Host A, Router R1, and Host B.
     Wires them together using PhysicalLink instances.
     """
-    host_a = Host(config.HOST_A_IP, config.HOST_A_MAC, config.HOST_A_ROUTING_TABLE)
-    host_b = Host(config.HOST_B_IP, config.HOST_B_MAC, config.HOST_B_ROUTING_TABLE)
-    router = Router(config.ROUTER_R1_IF1_IP, config.ROUTER_R1_IF1_MAC, config.ROUTER_R1_IF2_IP, config.ROUTER_R1_IF2_MAC, config.ROUTER_R1_ROUTING_TABLE)
+    host_a = Host("Host A", config.HOST_A_IP, config.HOST_A_MAC, config.HOST_A_ROUTING_TABLE)
+    host_b = Host("Host B", config.HOST_B_IP, config.HOST_B_MAC, config.HOST_B_ROUTING_TABLE)
+    router = Router("Router R1", config.ROUTER_R1_IF1_IP, config.ROUTER_R1_IF1_MAC, config.ROUTER_R1_ROUTING_TABLE)
 
     link_a_to_r1 = PhysicalLink(host_a, router)
     link_r1_to_b = PhysicalLink(router, host_b)
