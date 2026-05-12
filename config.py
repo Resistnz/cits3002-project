@@ -19,8 +19,13 @@ ROUTER_R1_IF1_MAC = "BB:BB:BB:BB:BB:BB"
 ROUTER_R1_IF2_IP = "10.0.2.1"
 ROUTER_R1_IF2_MAC = "CC:CC:CC:CC:CC:CC"
 
-# Routing Tables: Maps Destination Subnet/IP -> (Next Hop IP, Outgoing Interface)
-# Example format: { "10.0.2.0/24": ("10.0.2.20", 2) }
-HOST_A_ROUTING_TABLE = {}
-HOST_B_ROUTING_TABLE = {}
-ROUTER_R1_ROUTING_TABLE = {}
+# Destination Network -> (Next Hop IP, Outgoing Interface)
+# If Next Hop IP is None, it is a directly connected network
+HOST_A_ROUTING_TABLE = {"10.0.2.20": ("10.0.1.1", 1)}
+HOST_B_ROUTING_TABLE = {"10.0.1.10": ("10.0.2.1", 1)}
+ROUTER_R1_ROUTING_TABLE = {"10.0.1.10": (None, 1), "10.0.2.20": (None, 2)}
+
+# Simplified ARP Tables: Maps Next Hop IP -> MAC Address
+HOST_A_MAC_TABLE = {"10.0.1.1": ROUTER_R1_IF1_MAC}
+HOST_B_MAC_TABLE = {"10.0.2.1": ROUTER_R1_IF2_MAC}
+ROUTER_R1_MAC_TABLE = {HOST_A_IP: HOST_A_MAC, HOST_B_IP: HOST_B_MAC}

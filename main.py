@@ -7,12 +7,17 @@ def setup_network():
     Initializes Host A, Router R1, and Host B.
     Wires them together using PhysicalLink instances.
     """
-    host_a = Host("Host A", config.HOST_A_IP, config.HOST_A_MAC, config.HOST_A_ROUTING_TABLE)
-    host_b = Host("Host B", config.HOST_B_IP, config.HOST_B_MAC, config.HOST_B_ROUTING_TABLE)
-    router = Router("Router R1", config.ROUTER_R1_IF1_IP, config.ROUTER_R1_IF1_MAC, config.ROUTER_R1_ROUTING_TABLE)
+    host_a = Host("Host A", config.HOST_A_IP, config.HOST_A_MAC, config.HOST_A_ROUTING_TABLE, config.HOST_A_MAC_TABLE)
+    host_b = Host("Host B", config.HOST_B_IP, config.HOST_B_MAC, config.HOST_B_ROUTING_TABLE, config.HOST_B_MAC_TABLE)
+    
+    router_config = {
+        1: {'ip': config.ROUTER_R1_IF1_IP, 'mac': config.ROUTER_R1_IF1_MAC},
+        2: {'ip': config.ROUTER_R1_IF2_IP, 'mac': config.ROUTER_R1_IF2_MAC}
+    }
+    router = Router("Router R1", router_config, config.ROUTER_R1_ROUTING_TABLE, config.ROUTER_R1_MAC_TABLE)
 
-    link_a_to_r1 = PhysicalLink(host_a, router)
-    link_r1_to_b = PhysicalLink(router, host_b)
+    link_a_to_r1 = PhysicalLink(host_a, 1, router, 1)
+    link_r1_to_b = PhysicalLink(router, 2, host_b, 1)
 
     return host_a, router, host_b
 

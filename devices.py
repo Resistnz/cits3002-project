@@ -7,37 +7,39 @@ class PhysicalLink:
         self.iface1 = iface1
         self.device2 = device2
         self.iface2 = iface2
+        
+        # Automatically connect the devices to this link
+        self.device1.connect(iface1, self)
+        self.device2.connect(iface2, self)
 
+    # Deliver the frame to the device on the other end
     def transmit(self, frame, source_device):
-        """Delivers the frame to the opposite device's Data Link layer."""
-
         if source_device == self.device1.name:
             self.device2.l2.receive_from_physical(frame, self.iface2)
         elif source_device == self.device2.name:
             self.device1.l2.receive_from_physical(frame, self.iface1)
 
-        pass
-
 class Node:
-    """Base class for any networked device."""
     def __init__(self, name: str):
         self.name = name
         self.interfaces = {} # Hardware interfaces connected to PhysicalLinks
 
+    # Attach a physical link to an interface
     def connect(self, interface_id: int, link: PhysicalLink):
-        """Attaches a physical link to an interface."""
-        pass
+        self.interfaces[interface_id] = link
 
 class Host(Node):
     """End-device containing Layers 2, 3, and 4."""
-    def __init__(self, name: str, ip: str, mac: str, routing_table: dict):
+    def __init__(self, name: str, ip: str, mac: str, routing_table: dict, mac_table: dict = None):
         super().__init__(name)
         self.ip = ip
         self.mac = mac
+        self.ips = {1: ip}
+        self.macs = {1: mac}
         
         # Instantiate and link layers
-        self.l2 = DataLinkLayer(name, self.interfaces)
-        self.l3 = NetworkLayer(name, routing_table, self.l2)
+        self.l2 = DataLinkLayer(name, self.interfaces, self.macs, mac_table)
+        self.l3 = NetworkLayer(name, self.ips, routing_table, self.l2)
         self.l4 = TransportLayer(name, self.l3)
         
         # Wire the layers together internally
@@ -47,19 +49,19 @@ class Host(Node):
     def send_message(self, message: str, dest_ip: str):
         """Simulates the Application Layer sending data."""
 
-        self.l4.receive_from_application(message, dest_ip)
+        self.l4.receive_from_application(message, self.ip, dest_ip)
 
         pass
 
 class Router(Node):
     """Intermediate device containing only Layers 2 and 3."""
-    def __init__(self, name: str, ip: str, mac: str, routing_table: dict):
+    def __init__(self, name: str, interfaces_config: dict, routing_table: dict, mac_table: dict = None):
         super().__init__(name)
-        self.ip = ip
-        self.mac = mac
+        self.ips = {iface: conf['ip'] for iface, conf in interfaces_config.items()}
+        self.macs = {iface: conf['mac'] for iface, conf in interfaces_config.items()}
 
         # Routers do not have a Transport Layer
-        self.l2 = DataLinkLayer(name, self.interfaces)
-        self.l3 = NetworkLayer(name, routing_table, self.l2)
+        self.l2 = DataLinkLayer(name, self.interfaces, self.macs, mac_table)
+        self.l3 = NetworkLayer(name, self.ips, routing_table, self.l2)
         
         self.l2.network_layer = self.l3
