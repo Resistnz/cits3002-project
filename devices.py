@@ -10,6 +10,12 @@ class PhysicalLink:
 
     def transmit(self, frame, source_device):
         """Delivers the frame to the opposite device's Data Link layer."""
+
+        if source_device == self.device1.name:
+            self.device2.l2.receive_from_physical(frame, self.iface2)
+        elif source_device == self.device2.name:
+            self.device1.l2.receive_from_physical(frame, self.iface1)
+
         pass
 
 class Node:
@@ -38,8 +44,11 @@ class Host(Node):
         self.l2.network_layer = self.l3
         self.l3.transport_layer = self.l4
 
-    def generate_traffic(self, message_size_bytes: int, dest_ip: str):
+    def send_message(self, message: str, dest_ip: str):
         """Simulates the Application Layer sending data."""
+
+        self.l4.receive_from_application(message, dest_ip)
+
         pass
 
 class Router(Node):

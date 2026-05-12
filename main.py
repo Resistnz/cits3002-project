@@ -35,7 +35,7 @@ def main():
     host_a, router, host_b = setup_network()
     
     # Trigger the simulation
-    host_a.generate_traffic(message_size, config.HOST_B_IP)
+    host_a.send_message("A" * message_size, config.HOST_B_IP)
 
 if __name__ == "__main__":
     main()

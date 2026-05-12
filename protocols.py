@@ -38,10 +38,18 @@ class TransportLayer:
 
     def receive_from_application(self, data: str, dest_ip: str):
         """Chunks data into 500-byte max segments, applies rdt2.2 transmission."""
+
+        segment = L4Segment(src_port=12345, dst_port=80, seq_num=self.seq_num, is_ack=False, data=data)
+        self.send_segment(segment, dest_ip)
+
         pass
 
     def send_segment(self, segment: L4Segment, dest_ip: str):
         """Computes checksum, encapsulates, and sends to Layer 3."""
+
+        segment.checksum = self._compute_checksum(segment.data)
+        self.network_layer.receive_from_transport(segment, self.host_name, dest_ip)
+
         pass
 
     def receive_from_network(self, segment: L4Segment, src_ip: str):
@@ -66,6 +74,10 @@ class NetworkLayer:
 
     def receive_from_transport(self, segment: L4Segment, src_ip: str, dst_ip: str):
         """Encapsulates segment into L3Packet and performs routing."""
+
+        packet = L3Packet(src_ip=src_ip, dst_ip=dst_ip, payload=segment)
+        self._route_packet(packet)
+
         pass
 
     def receive_from_datalink(self, packet: L3Packet, interface: int):
@@ -74,6 +86,12 @@ class NetworkLayer:
 
     def _route_packet(self, packet: L3Packet):
         """Looks up dst_ip in routing_table, determines next-hop and interface."""
+
+        dest_ip = packet.dst_ip
+        if dest_ip in self.routing_table:
+            next_hop_ip, interface = self.routing_table[dest_ip]
+            self.datalink_layer.receive_from_network(packet, next_hop_ip, interface)
+
         pass
 
 class DataLinkLayer:
@@ -86,10 +104,21 @@ class DataLinkLayer:
 
     def receive_from_network(self, packet: L3Packet, next_hop_ip: str, interface: int):
         """Looks up destination MAC, creates frame, and transmits on interface."""
+
+        if next_hop_ip in self.mac_table:
+            dst_mac = self.mac_table[next_hop_ip]
+
+            frame = L2Frame(src_mac=self.interfaces[interface].device1.mac, dst_mac=dst_mac, payload=packet)
+            self.interfaces[interface].transmit(frame, self.device_name)
+
         pass
 
     def receive_from_physical(self, frame: L2Frame, interface: int):
         """Learns source MAC, decapsulates, and delivers to Network Layer."""
+
+        self.mac_table[frame.src_mac] = frame.src_mac
+        self.network_layer.receive_from_datalink(frame.payload, interface)
+
         pass
 
     def _forward_frame(self, frame: L2Frame, interface: int):
