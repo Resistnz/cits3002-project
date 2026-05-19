@@ -2,7 +2,7 @@
 
 class L4Segment:
     """Represents a Transport Layer (UDP-like) Segment."""
-    def __init__(self, src_port: int, dst_port: int, seq_num: int, is_ack: bool, data: str, checksum: int = 0):
+    def __init__(self, src_port: int, dst_port: int, seq_num: int, is_ack: bool, data: bytes, checksum: int = 0):
         self.src_port = src_port
         self.dst_port = dst_port
         self.seq_num = seq_num
@@ -39,7 +39,7 @@ class TransportLayer:
     def log(self, message: str):
         print(f"{self.host_name}: Layer 4: {message}")
 
-    def receive_from_application(self, data: str, src_ip: str, dest_ip: str):
+    def receive_from_application(self, data: bytes, src_ip: str, dest_ip: str):
         """Chunks data into 500-byte max segments, applies rdt2.2 transmission."""
 
         self.log(f"Data received from Application Layer. Data size={len(data)}")
@@ -54,7 +54,7 @@ class TransportLayer:
     def send_segment(self, segment: L4Segment, src_ip:str, dest_ip: str):
         """Computes checksum, encapsulates, and sends to Layer 3."""
 
-        segment.checksum = self._compute_checksum(segment.data)
+        segment.checksum = self.compute_checksum(segment.data)
 
         self.log(f"Checksum computed")
         self.log(f"Segment created by adding transport layer header (DATA, seq={segment.seq_num}) (encapsulation)")
@@ -67,8 +67,10 @@ class TransportLayer:
 
         print()
 
-        if not self._verify_checksum(segment):
+        # We don't check checksum on ACKS
+        if not segment.is_ack and not self.verify_checksum(segment):
             # Checksum failed, ignore segment
+            self.log(f"Checksum failed!!! Segment discarded")
             return
             
         self.log(f"Segment received from Network Layer")
@@ -81,19 +83,38 @@ class TransportLayer:
         self.log(f"DATA segment delivered to Application Layer. Data size={len(segment.data)}")
 
         # Send an ACK
-        ack_segment = L4Segment(src_port=12345, dst_port=80, seq_num=self.seq_num, is_ack=True, data="")
+        ack_segment = L4Segment(src_port=12345, dst_port=80, seq_num=self.seq_num, is_ack=True, data=b"")
         self.log(f"Segment created by adding transport layer header (ACK, seq={ack_segment.seq_num})")
         self.log(f"Segment sent to Network Layer")
 
         self.network_layer.receive_from_transport(ack_segment, dst_ip, src_ip)
     
-    # TODO
-    def _compute_checksum(self, data: str) -> int:
-        return 0
+    # Using standard Internet Checksum from week 8 lecture 
+    def compute_checksum(self, data: bytes) -> int:
+        total = 0
 
-    # TODO
-    def _verify_checksum(self, segment: L4Segment) -> bool:
-        return True
+        # Handle padding for an odd number of bytes
+        if len(data) % 2 != 0:
+            data += b'\x00'
+
+        # Sum 16-bit chunks
+        for i in range(0, len(data), 2):
+            # Just bitshift and add 2 chars to get 16 bit word
+            word = (data[i] << 8) + data[i + 1]
+            total += word
+            
+        # Do the end carry-over bits
+        while (total >> 16) > 0:
+            total = (total & 0xFFFF) + (total >> 16)
+            
+        # 1's complement of the result
+        return ~total & 0xFFFF
+
+    # Recalculate the checksum and compare it
+    def verify_checksum(self, segment: L4Segment) -> bool:
+        computed_checksum = self.compute_checksum(segment.data)
+
+        return computed_checksum == segment.checksum
 
 class NetworkLayer:
     """Layer 3: Handles IP routing, TTL, and logical forwarding."""

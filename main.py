@@ -16,8 +16,8 @@ def setup_network():
     }
     router = Router("Router R1", router_config, config.ROUTER_R1_ROUTING_TABLE, config.ROUTER_R1_MAC_TABLE)
 
-    link_a_to_r1 = Wire(host_a, 1, router, 1)
-    link_r1_to_b = Wire(router, 2, host_b, 1)
+    a_to_r1 = Wire(host_a, 1, router, 1)
+    r1_to_b = Wire(router, 2, host_b, 1)
 
     return host_a, router, host_b
 
