@@ -1,11 +1,11 @@
 import sys
 import config
-from devices import Host, Router, PhysicalLink
+from devices import Host, Router, Wire
 
 def setup_network():
     """
     Initializes Host A, Router R1, and Host B.
-    Wires them together using PhysicalLink instances.
+    Wires them together using Wire instances.
     """
     host_a = Host("Host A", config.HOST_A_IP, config.HOST_A_MAC, config.HOST_A_ROUTING_TABLE, config.HOST_A_MAC_TABLE)
     host_b = Host("Host B", config.HOST_B_IP, config.HOST_B_MAC, config.HOST_B_ROUTING_TABLE, config.HOST_B_MAC_TABLE)
@@ -16,8 +16,8 @@ def setup_network():
     }
     router = Router("Router R1", router_config, config.ROUTER_R1_ROUTING_TABLE, config.ROUTER_R1_MAC_TABLE)
 
-    link_a_to_r1 = PhysicalLink(host_a, 1, router, 1)
-    link_r1_to_b = PhysicalLink(router, 2, host_b, 1)
+    link_a_to_r1 = Wire(host_a, 1, router, 1)
+    link_r1_to_b = Wire(router, 2, host_b, 1)
 
     return host_a, router, host_b
 
@@ -40,7 +40,7 @@ def main():
     host_a, router, host_b = setup_network()
     
     # Trigger the simulation
-    host_a.send_message("A" * message_size, config.HOST_B_IP)
+    host_a.send_message(b"A" * message_size, config.HOST_B_IP)
 
 if __name__ == "__main__":
     main()

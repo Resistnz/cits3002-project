@@ -42,12 +42,14 @@ class TransportLayer:
     def receive_from_application(self, data: str, src_ip: str, dest_ip: str):
         """Chunks data into 500-byte max segments, applies rdt2.2 transmission."""
 
-        # TODO: Data chunking
-
         self.log(f"Data received from Application Layer. Data size={len(data)}")
 
-        segment = L4Segment(src_port=12345, dst_port=80, seq_num=self.seq_num, is_ack=False, data=data)
-        self.send_segment(segment, src_ip, dest_ip)
+        # Data Chunking
+        for i in range(0, len(data), 500):
+            chunk = data[i:i+500]
+
+            segment = L4Segment(src_port=12345, dst_port=80, seq_num=self.seq_num, is_ack=False, data=chunk)
+            self.send_segment(segment, src_ip, dest_ip)
 
     def send_segment(self, segment: L4Segment, src_ip:str, dest_ip: str):
         """Computes checksum, encapsulates, and sends to Layer 3."""
@@ -124,7 +126,7 @@ class NetworkLayer:
         self.log(f"Packet received from Data Link Layer: SRC_IP={packet.src_ip}, DST_IP={packet.dst_ip}, TTL={packet.ttl}")
         self.log(f"Destination IP read: {packet.dst_ip}")
 
-        # IF this packet is for us, send it up
+        # If this packet is for us, send it up
         if packet.dst_ip in self.ips.values():
             self.log(f"Packet identified as local delivery")
             self.log(f"Segment delivered to Transport Layer")

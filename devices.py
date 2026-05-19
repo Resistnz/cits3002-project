@@ -1,6 +1,6 @@
 from protocols import DataLinkLayer, NetworkLayer, TransportLayer
 
-class PhysicalLink:
+class Wire:
     """Simulates a wire between two specific interfaces on two devices."""
     def __init__(self, device1, iface1: int, device2, iface2: int):
         self.device1 = device1
@@ -22,10 +22,10 @@ class PhysicalLink:
 class Node:
     def __init__(self, name: str):
         self.name = name
-        self.interfaces = {} # Hardware interfaces connected to PhysicalLinks
+        self.interfaces = {} # Hardware interfaces connected to Wires
 
     # Attach a physical link to an interface
-    def connect(self, interface_id: int, link: PhysicalLink):
+    def connect(self, interface_id: int, link: Wire):
         self.interfaces[interface_id] = link
 
 class Host(Node):
