@@ -37,14 +37,14 @@ class TransportLayer:
         self.expected_seq_num = 0
 
     def log(self, message: str):
-        print(f"{self.host_name} Layer 4: {message}")
+        print(f"{self.host_name}: Layer 4: {message}")
 
     def receive_from_application(self, data: str, src_ip: str, dest_ip: str):
         """Chunks data into 500-byte max segments, applies rdt2.2 transmission."""
 
         # TODO: Data chunking
 
-        self.log(f"Received from Application Layer. Data size={len(data)}")
+        self.log(f"Data received from Application Layer. Data size={len(data)}")
 
         segment = L4Segment(src_port=12345, dst_port=80, seq_num=self.seq_num, is_ack=False, data=data)
         self.send_segment(segment, src_ip, dest_ip)
@@ -55,13 +55,15 @@ class TransportLayer:
         segment.checksum = self._compute_checksum(segment.data)
 
         self.log(f"Checksum computed")
-        self.log(f"Segment created by adding transport layer header (DATA,seq={segment.seq_num}) (encapsulation)")
-        self.log(f"Segment sent to Network Layer\n")
+        self.log(f"Segment created by adding transport layer header (DATA, seq={segment.seq_num}) (encapsulation)")
+        self.log(f"Segment sent to Network Layer")
 
         self.network_layer.receive_from_transport(segment, src_ip, dest_ip)
 
     def receive_from_network(self, segment: L4Segment, src_ip: str, dst_ip: str):
         """Verifies checksum, processes ACK or DATA, and sends to App or retransmits."""
+
+        print()
 
         if not self._verify_checksum(segment):
             # Checksum failed, ignore segment
@@ -74,12 +76,12 @@ class TransportLayer:
             self.log(f"ACK received: seq={segment.seq_num}")
             return
 
-        self.log(f"DATA segment delivered to Application Layer. Datasize={len(segment.data)}")
+        self.log(f"DATA segment delivered to Application Layer. Data size={len(segment.data)}")
 
         # Send an ACK
         ack_segment = L4Segment(src_port=12345, dst_port=80, seq_num=self.seq_num, is_ack=True, data="")
-        self.log(f"Segment created by adding transport layer header (ACK,seq={ack_segment.seq_num}) (encapsulation)")
-        self.log(f"Segment sent to Network Layer\n")
+        self.log(f"Segment created by adding transport layer header (ACK, seq={ack_segment.seq_num})")
+        self.log(f"Segment sent to Network Layer")
 
         self.network_layer.receive_from_transport(ack_segment, dst_ip, src_ip)
     
@@ -87,6 +89,7 @@ class TransportLayer:
     def _compute_checksum(self, data: str) -> int:
         return 0
 
+    # TODO
     def _verify_checksum(self, segment: L4Segment) -> bool:
         return True
 
@@ -100,12 +103,15 @@ class NetworkLayer:
         self.transport_layer = None # Linked if device is a Host
 
     def log(self, message: str):
-        print(f"{self.device_name} Layer 3: {message}")
+        print(f"{self.device_name}: Layer 3: {message}")
 
     def receive_from_transport(self, segment: L4Segment, src_ip: str, dst_ip: str):
         """Encapsulates segment into L3Packet and performs routing."""
 
-        self.log(f"Segment received from Transport Layer. SRC_IP={src_ip}, DST_IP={dst_ip}, TTL=100")
+        print()
+
+        self.log(f"Segment received from Transport Layer: SRC_IP={src_ip}, DST_IP={dst_ip}, TTL=100")
+        self.log(f"Destination IP read: {dst_ip}")
 
         packet = L3Packet(src_ip=src_ip, dst_ip=dst_ip, payload=segment)
         self._route_packet(packet)
@@ -113,38 +119,47 @@ class NetworkLayer:
     def receive_from_datalink(self, packet: L3Packet, interface: int):
         """Decrements TTL, drops if 0. Checks if local delivery or needs forwarding."""
 
-        self.log(f"Packet recieved from Data Link Layer: SRC_IP={packet.src_ip}, DST_IP={packet.dst_ip}, TTL={packet.ttl}")
+        print()
+        
+        self.log(f"Packet received from Data Link Layer: SRC_IP={packet.src_ip}, DST_IP={packet.dst_ip}, TTL={packet.ttl}")
         self.log(f"Destination IP read: {packet.dst_ip}")
 
-        packet.ttl -= 1
-
-        self.log(f"TTL decremented: {packet.ttl + 1} → {packet.ttl}\n")
-
-        if packet.ttl <= 0:
-            return
-        
-        # If the packet isn't for me, re-route it
+        # IF this packet is for us, send it up
         if packet.dst_ip in self.ips.values():
+            self.log(f"Packet identified as local delivery")
+            self.log(f"Segment delivered to Transport Layer")
             self.transport_layer.receive_from_network(packet.payload, packet.src_ip, packet.dst_ip)
+        # Keep it goin
         else:
+            packet.ttl -= 1
+
+            self.log(f"TTL decremented: {packet.ttl + 1} → {packet.ttl}")
+
+            if packet.ttl <= 0:
+                return
+            
             self._route_packet(packet)
 
     def _route_packet(self, packet: L3Packet):
         """Looks up dst_ip in routing_table"""
 
         dest_ip = packet.dst_ip
-        self.log("Destination IP read: " + dest_ip)
 
         next_hop_ip, interface = self.routing_table[dest_ip]
 
-        # If next_hop_ip is None, the destination is directly connected (e.g., from the router)
+        # If next_hop_ip is None, the destination is directly connected (e.g. from the router)
         if next_hop_ip is None:
             next_hop_ip = dest_ip
 
         self.log("Routing table lookup performed")
         self.log("Next-hop IP determined: " + next_hop_ip)
 
-        self.log("Packet forwarded to Data Link Layer\n")
+        if "Router" in self.device_name:
+            self.log(f"Outgoing interface selected (Interface {interface})")
+        else:
+            self.log("Outgoing interface selected")
+
+        self.log("Packet forwarded to Data Link Layer")
         self.datalink_layer.receive_from_network(packet, next_hop_ip, interface)
 
 class DataLinkLayer:
@@ -157,12 +172,14 @@ class DataLinkLayer:
         self.network_layer = None
 
     def log(self, message: str):
-        print(f"{self.device_name} Layer 2: {message}")
+        print(f"{self.device_name}: Layer 2: {message}")
 
     def receive_from_network(self, packet: L3Packet, next_hop_ip: str, interface: int):
         """Looks up destination MAC, creates frame, and transmits on interface."""
 
-        self.log(f"Packet recieved from Network Layer")
+        print()
+        
+        self.log(f"Packet received from Network Layer")
 
         dst_mac = self.mac_table[next_hop_ip]
 
@@ -170,8 +187,12 @@ class DataLinkLayer:
 
         frame = L2Frame(src_mac=self.macs[interface], dst_mac=dst_mac, payload=packet)
 
-        self.log(f"Frame Created: SRC_MAC={frame.src_mac}, DST_MAC={frame.dst_mac}")
-        self.log(f"Frame sent\n")
+        self.log(f"Frame created: SRC_MAC={frame.src_mac}, DST_MAC={frame.dst_mac}")
+        
+        if "Router" in self.device_name:
+            self.log(f"Frame forwarded on Interface {interface}")
+        else:
+            self.log(f"Frame sent")
 
         self.interfaces[interface].transmit(frame, self.device_name)
 
@@ -180,12 +201,21 @@ class DataLinkLayer:
     def receive_from_physical(self, frame: L2Frame, interface: int):
         """Learns source MAC, decapsulates, and delivers to Network Layer."""
 
-        self.log(f"Frame recieved on interface {interface}")
+        print()
+        
+        if "Router" in self.device_name:
+            self.log(f"Frame received on Interface {interface}")
+        else:
+            self.log(f"Frame received")
 
         self.mac_table[frame.payload.src_ip] = frame.src_mac
 
-        self.log(f"Source MAC learned: {frame.src_mac} on interface {interface}")
-        self.log(f"Packet delivered to Network Layer\n")
+        if "Router" in self.device_name:
+            self.log(f"Source MAC learned: {frame.src_mac} on Interface {interface}")
+        else:
+            self.log(f"Source MAC learned: {frame.src_mac}")
+            
+        self.log(f"Packet delivered to Network Layer")
 
         self.network_layer.receive_from_datalink(frame.payload, interface)
 
