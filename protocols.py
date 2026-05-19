@@ -33,62 +33,148 @@ class TransportLayer:
     def __init__(self, host_name: str, network_layer):
         self.host_name = host_name
         self.network_layer = network_layer
-        self.seq_num = 0  # rdt2.2 state (0 or 1)
+
+        # Sender state
+        self.seq_num = 0 # rdt2.2 state (0 or 1)
+        self.waiting_for_ack = False
+        self.last_ack_received = None
+        self.current_segment = None
+
+        # Receiver state
         self.expected_seq_num = 0
 
     def log(self, message: str):
         print(f"{self.host_name}: Layer 4: {message}")
 
     def receive_from_application(self, data: bytes, src_ip: str, dest_ip: str):
-        """Chunks data into 500-byte max segments, applies rdt2.2 transmission."""
-
+        """Receives application data, segments it into chunks of max 500 bytes, 
+        and transmits sequentially using rdt2.2 stop-and-wait behaviour."""
         self.log(f"Data received from Application Layer. Data size={len(data)}")
 
-        # Data Chunking
+        # Split data into 500-byte chunks
         for i in range(0, len(data), 500):
-            chunk = data[i:i+500]
+            chunk = data[i:i + 500]
 
-            segment = L4Segment(src_port=12345, dst_port=80, seq_num=self.seq_num, is_ack=False, data=chunk)
-            self.send_segment(segment, src_ip, dest_ip)
+            # Create DATA segment
+            segment = L4Segment(src_port=12345, dst_port=80, seq_num=self.seq_num, is_ack=False, data=chunk) 
 
-    def send_segment(self, segment: L4Segment, src_ip:str, dest_ip: str):
-        """Computes checksum, encapsulates, and sends to Layer 3."""
+            # Save current segment in case we need to retransmit it
+            self.current_segment = segment
+            # Stop-and-wait send loop
+            ack_received = False
 
-        segment.checksum = self.compute_checksum(segment.data)
+            while not ack_received:
+                self.waiting_for_ack = True
+                self.last_ack_received = None
 
-        self.log(f"Checksum computed")
-        self.log(f"Segment created by adding transport layer header (DATA, seq={segment.seq_num}) (encapsulation)")
-        self.log(f"Segment sent to Network Layer")
+                self.send_segment(segment, src_ip, dest_ip)
+                # In this simulator, ACK handling occurs synchronously
+                # during nested method calls through the protocol stack.
+
+                if self.last_ack_received == segment.seq_num:
+                    ack_received = True
+                    self.waiting_for_ack = False
+
+                    # Alternate the sequence number between 0 and 1. Intuitive way via arithmetic.
+                    if self.seq_num == 0:
+                        self.seq_num = 1
+                    else:
+                        self.seq_num = 0
+
+                else:
+                    self.log(
+                        f"Incorrect ACK received. Retransmitting segment seq={segment.seq_num}"
+                    )
+
+    def send_segment(self, segment: L4Segment, src_ip: str, dest_ip: str):
+        """Computes checksum and forwards segment to the Network Layer."""
+
+        # Only compute checksum for DATA segments
+        if not segment.is_ack:
+            segment.checksum = self.compute_checksum(segment.data)
+            self.log("Checksum computed")
+
+        segment_type = "ACK" if segment.is_ack else "DATA" #Host A, moving down is DATA. HostB will be ACK
+
+        self.log(f"Segment created by adding transport layer header " f"({segment_type}, seq={segment.seq_num}) " f"(encapsulation)")
+        self.log("Segment sent to Network Layer")
 
         self.network_layer.receive_from_transport(segment, src_ip, dest_ip)
 
     def receive_from_network(self, segment: L4Segment, src_ip: str, dst_ip: str):
-        """Verifies checksum, processes ACK or DATA, and sends to App or retransmits."""
+        """Handles incoming DATA and ACK segments using rdt2.2 logic.
+        Verifies checksum, processes ACK or DATA, and sends to App or retransmits."""
 
         print()
+        self.log("Segment received from Network Layer")
 
-        # We don't check checksum on ACKS
-        if not segment.is_ack and not self.verify_checksum(segment):
-            # Checksum failed, ignore segment
-            self.log(f"Checksum failed!!! Segment discarded")
-            return
-            
-        self.log(f"Segment received from Network Layer")
-        self.log(f"Checksum verified")
-        
+        # 1. ACK Processing (Sender Side)
         if segment.is_ack:
+
             self.log(f"ACK received: seq={segment.seq_num}")
+
+            self.last_ack_received = segment.seq_num
+
             return
 
-        self.log(f"DATA segment delivered to Application Layer. Data size={len(segment.data)}")
+        # 2. DATA Processing (Receiver Side)
+        # Check if checksum matches
+        if not self.verify_checksum(segment):
+            self.log("Checksum failed!!! Segment discarded") #if checksum fails, ignore the segment.
 
-        # Send an ACK
-        ack_segment = L4Segment(src_port=12345, dst_port=80, seq_num=self.seq_num, is_ack=True, data=b"")
-        self.log(f"Segment created by adding transport layer header (ACK, seq={ack_segment.seq_num})")
-        self.log(f"Segment sent to Network Layer")
+            # Re-send ACK for the last correctly received packet
+            if self.expected_seq_num == 0:
+                previous_ack = 1
+            else:
+                previous_ack = 0
+            
+            ack_segment = L4Segment(src_port=12345, dst_port=80, seq_num=previous_ack, is_ack=True, data=b"")
 
-        self.network_layer.receive_from_transport(ack_segment, dst_ip, src_ip)
-    
+            self.log(f"Segment created by adding transport layer header " f"(ACK, seq={ack_segment.seq_num})")
+            self.log("Segment sent to Network Layer")
+
+            self.network_layer.receive_from_transport(ack_segment, dst_ip, src_ip)
+
+            return
+
+        self.log("Checksum verified")
+
+        #3. Correct Expected Segment
+        if segment.seq_num == self.expected_seq_num:
+
+            self.log(f"DATA segment delivered to Application Layer. " f"Data size={len(segment.data)}")
+
+            # Send ACK for correctly received segment
+            ack_segment = L4Segment(src_port=12345, dst_port=80, seq_num=segment.seq_num, is_ack=True, data=b"")
+
+            self.log(f"Segment created by adding transport layer header " f"(ACK, seq={ack_segment.seq_num})")
+            self.log("Segment sent to Network Layer")
+
+            self.network_layer.receive_from_transport(ack_segment, dst_ip, src_ip)
+
+            # Switch expected sequence number for next packet
+            if self.expected_seq_num == 0:
+                self.expected_seq_num = 1
+            else:
+                self.expected_seq_num = 0
+
+        #4. Incorrect, Duplicate Segment
+        else:
+            self.log(f"Duplicate DATA segment received. " f"Expected seq={self.expected_seq_num}, " f"received seq={segment.seq_num}")
+
+            # Send ACK again for the last valid packet
+            if self.expected_seq_num == 0:
+                previous_ack = 1
+            else:
+                previous_ack = 0
+
+            ack_segment = L4Segment(src_port=12345, dst_port=80, seq_num=previous_ack, is_ack=True, data=b"")
+
+            self.log(f"Segment created by adding transport layer header " f"(ACK, seq={ack_segment.seq_num})")
+            self.log("Segment sent to Network Layer")
+
+            self.network_layer.receive_from_transport(ack_segment, dst_ip, src_ip)
+
     # Using standard Internet Checksum from week 8 lecture 
     def compute_checksum(self, data: bytes) -> int:
         total = 0
@@ -159,8 +245,9 @@ class NetworkLayer:
             self.log(f"TTL decremented: {packet.ttl + 1} → {packet.ttl}")
 
             if packet.ttl <= 0:
+                self.log("Packet dropped due to TTL expiry")
                 return
-            
+
             self._route_packet(packet)
 
     def _route_packet(self, packet: L3Packet):
