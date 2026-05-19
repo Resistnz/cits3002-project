@@ -72,7 +72,7 @@ class TransportLayer:
                 # In this simulator, ACK handling occurs synchronously
                 # during nested method calls through the protocol stack.
 
-                if self.last_ack_received == self.seq_num:
+                if self.last_ack_received == segment.seq_num:
                     ack_received = True
                     self.waiting_for_ack = False
 
