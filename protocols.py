@@ -57,9 +57,8 @@ class TransportLayer:
 
             # Create DATA segment
             segment = L4Segment(src_port=12345, dst_port=80, seq_num=self.seq_num, is_ack=False, data=chunk) 
-            #? ACK alright if we use boolean? Or should we use binary bits?
 
-            # Track outstanding segment for possible retransmission
+            # Save current segment in case we need to retransmit it
             self.current_segment = segment
             # Stop-and-wait send loop
             ack_received = False
@@ -77,7 +76,10 @@ class TransportLayer:
                     self.waiting_for_ack = False
 
                     # Alternate the sequence number between 0 and 1. Intuitive way via arithmetic.
-                    self.seq_num = 1 - self.seq_num
+                    if self.seq_num == 0:
+                        self.seq_num = 1
+                    else:
+                        self.seq_num = 0
 
                 else:
                     self.log(
@@ -116,12 +118,16 @@ class TransportLayer:
             return
 
         # 2. DATA Processing (Receiver Side)
-        # Verify checksum
+        # Check if checksum matches
         if not self.verify_checksum(segment):
             self.log("Checksum failed!!! Segment discarded") #if checksum fails, ignore the segment.
 
-            # Re-send previous ACK if corruption occurs
-            previous_ack = 1 - self.expected_seq_num
+            # Re-send ACK for the last correctly received packet
+            if self.expected_seq_num == 0:
+                previous_ack = 1
+            else:
+                previous_ack = 0
+            
             ack_segment = L4Segment(src_port=12345, dst_port=80, seq_num=previous_ack, is_ack=True, data=b"")
 
             self.log(f"Segment created by adding transport layer header " f"(ACK, seq={ack_segment.seq_num})")
@@ -146,15 +152,22 @@ class TransportLayer:
 
             self.network_layer.receive_from_transport(ack_segment, dst_ip, src_ip)
 
-            # Toggle expected sequence number
-            self.expected_seq_num = 1 - self.expected_seq_num
+            # Switch expected sequence number for next packet
+            if self.expected_seq_num == 0:
+                self.expected_seq_num = 1
+            else:
+                self.expected_seq_num = 0
 
         #4. Incorrect, Duplicate Segment
         else:
             self.log(f"Duplicate DATA segment received. " f"Expected seq={self.expected_seq_num}, " f"received seq={segment.seq_num}")
 
-            # Re-send ACK for last correctly received segment
-            previous_ack = 1 - self.expected_seq_num
+            # Send ACK again for the last valid packet
+            if self.expected_seq_num == 0:
+                previous_ack = 1
+            else:
+                previous_ack = 0
+
             ack_segment = L4Segment(src_port=12345, dst_port=80, seq_num=previous_ack, is_ack=True, data=b"")
 
             self.log(f"Segment created by adding transport layer header " f"(ACK, seq={ack_segment.seq_num})")
