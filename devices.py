@@ -1,4 +1,4 @@
-from protocols import DataLinkLayer, NetworkLayer, TransportLayer
+from protocol import DataLinkLayer, NetworkLayer, TransportLayer
 
 class Wire:
     """Simulate a wire between two interfaces on two devices"""
