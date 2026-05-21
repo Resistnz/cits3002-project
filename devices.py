@@ -1,7 +1,7 @@
 from protocols import DataLinkLayer, NetworkLayer, TransportLayer
 
 class Wire:
-    """Simulates a wire between two specific interfaces on two devices."""
+    """Simulate a wire between two interfaces on two devices"""
     def __init__(self, device1, iface1: int, device2, iface2: int):
         self.device1 = device1
         self.iface1 = iface1
@@ -29,7 +29,7 @@ class Node:
         self.interfaces[interface_id] = link
 
 class Host(Node):
-    """End-device containing Layers 2, 3, and 4."""
+    """Device that contains Layers 2, 3, and 4"""
     def __init__(self, name: str, ip: str, mac: str, routing_table: dict, mac_table: dict = None):
         super().__init__(name)
         self.ip = ip
@@ -47,14 +47,12 @@ class Host(Node):
         self.l3.transport_layer = self.l4
 
     def send_message(self, message: str, dest_ip: str):
-        """Simulates the Application Layer sending data."""
+        """Simulate the Application Layer sending data. WE don't actually do anything here"""
 
         self.l4.receive_from_application(message, self.ip, dest_ip)
 
-        pass
-
 class Router(Node):
-    """Intermediate device containing only Layers 2 and 3."""
+    """Device containing only Layers 2 and 3"""
     def __init__(self, name: str, interfaces_config: dict, routing_table: dict, mac_table: dict = None):
         super().__init__(name)
         self.ips = {iface: conf['ip'] for iface, conf in interfaces_config.items()}

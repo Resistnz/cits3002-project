@@ -3,10 +3,7 @@ import config
 from devices import Host, Router, Wire
 
 def setup_network():
-    """
-    Initializes Host A, Router R1, and Host B.
-    Wires them together using Wire instances.
-    """
+    """Initialise our hosts and wire them together"""
     host_a = Host("Host A", config.HOST_A_IP, config.HOST_A_MAC, config.HOST_A_ROUTING_TABLE, config.HOST_A_MAC_TABLE)
     host_b = Host("Host B", config.HOST_B_IP, config.HOST_B_MAC, config.HOST_B_ROUTING_TABLE, config.HOST_B_MAC_TABLE)
     
@@ -22,11 +19,7 @@ def setup_network():
     return host_a, router, host_b
 
 def main():
-    """
-    Parses command-line arguments for message size.
-    Initializes the network topology.
-    Triggers Host A to send the payload to Host B.
-    """
+    """Take command line input, set up the network and send a message"""
     if len(sys.argv) != 2:
         print("Usage: python main.py <message_size_in_bytes>")
         sys.exit(1)
@@ -39,7 +32,7 @@ def main():
 
     host_a, router, host_b = setup_network()
     
-    # Trigger the simulation
+    # Make it so
     host_a.send_message(b"A" * message_size, config.HOST_B_IP)
 
 if __name__ == "__main__":

@@ -304,8 +304,6 @@ class DataLinkLayer:
 
         self.interfaces[interface].transmit(frame, self.device_name)
 
-        pass
-
     def receive_from_physical(self, frame: L2Frame, interface: int):
         """Learn source MAC, decapsulates, and delivers to network Layer"""
 
@@ -326,5 +324,3 @@ class DataLinkLayer:
         self.log(f"Packet delivered to Network Layer")
 
         self.network_layer.receive_from_datalink(frame.payload, interface)
-
-        pass
