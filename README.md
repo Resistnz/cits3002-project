@@ -3,8 +3,6 @@
 24214277 - Tobias Camille
 24245674 - Kamlesh Senthilkumar
 
----
-
 ## File Structure
 ```text
 24214277-24245674/
