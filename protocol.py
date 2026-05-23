@@ -165,7 +165,7 @@ class TransportLayer:
             return
 
         # DATA Processing (Receiver Side)
-        # Correct expected data segment recieved
+        # Correct expected data segment received
         if segment.seq_num == self.expected_seq_num:
 
             self.log(f"DATA segment delivered to Application Layer. " f"Data size={len(segment.data)}")
@@ -180,7 +180,7 @@ class TransportLayer:
             else:
                 self.expected_seq_num = 0
 
-        # Incorrect, Duplicate data segment recieved
+        # Incorrect, Duplicate data segment received
         else:
             self.log(f"Duplicate DATA segment received. " f"Expected seq={self.expected_seq_num}, " f"received seq={segment.seq_num}")
 
