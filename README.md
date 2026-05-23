@@ -19,8 +19,8 @@
 ### Project organisation
 - main.py is the entry point for the simulator. 
 - protocol.py contains protocol layer and protocol data unit implementations. 
-- devices.py defines Hosts, Routers, and Wire connection links.
-- config.py stores static network configuration values.
+- devices.py defines the network topology components: Hosts, Routers, and Wire connection link.
+- config.py stores project-specified network configuration values.
 
 Our layer and frame/segment/packet classes all live in `protocol.py`, while the device classes are in `devices.py`. Our main file `main.py` handles starting the simulation, where it loads in our network config from `config.py`.
 
