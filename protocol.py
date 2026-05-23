@@ -1,17 +1,34 @@
+"""
+protocol.py
+This script implements protocol data unit (PDU) definitions of each layer and protocol stack layer functions:
+
+Protocol data units:
+- L4Segment: Transport-layer segment
+- L3Packet: Network-layer packet
+- L2Frame: Data Link-layer frame
+
+Class definitions and methods of each layer of protocol stack.
+Protocol layers:
+- TransportLayer: segmentation, checksum verification, and rdt2.2 logic
+- NetworkLayer: packet routing, forwarding, and TTL handling
+- DataLinkLayer: framing, MAC learning, and local frame delivery
+"""
 class L4Segment:
-    """Transport Layer (UDP-like) Segment"""
+    """Transport Layer (UDP-like) Segment."""
     def __init__(self, src_port: int, dst_port: int, seq_num: int, is_ack: bool, data: bytes, checksum: int = 0):
+        """Initialise transport-layer header fields and data payload"""
         self.src_port = src_port
         self.dst_port = dst_port
         self.seq_num = seq_num
         self.is_ack = is_ack
-        self.data = data
+        self.data = data # Data payload
         self.checksum = checksum
-        self.length = len(self.data) + 8 # Example header size, we don;t actually use this
+        self.length = len(self.data) + 8 # Size of transport-layer header
 
 class L3Packet:
-    """Network Layer (IP-like) Packet"""
+    """Network Layer (IP-like) Packet."""
     def __init__(self, src_ip: str, dst_ip: str, payload: L4Segment, ttl: int = 100):
+        """Initialise network layer header fields and encapsulate data segment from transport layer"""
         self.src_ip = src_ip
         self.dst_ip = dst_ip
         self.ttl = ttl
@@ -22,16 +39,22 @@ class L3Packet:
 class L2Frame:
     """Data Link Layer (Ethernet-like) Frame"""
     def __init__(self, src_mac: str, dst_mac: str, payload: L3Packet):
+        """Initialise data-link layer header fields and encapsulate data packet from network layer"""
         self.src_mac = src_mac
         self.dst_mac = dst_mac
         self.payload = payload
         self.type = 0x0800 
 
-# --- The Layers ---
-
 class TransportLayer:
-    """Layer 4: Port delivery, segmentation, checksums, and rdt2.2 acknoweldgment frames"""
+    """Implementation of Transport layer. This class is responsible for:
+    - segmentation of application layer data
+    - calculation and verification of checksums
+    - rdt2.2 acknowledgements
+    - perform re-transmissions
+    - data delivery between applications and network layer
+    """
     def __init__(self, host_name: str, network_layer):
+        """Initialise transport layer variables for sending and receiving end system"""
         self.host_name = host_name
         self.network_layer = network_layer
 
@@ -45,11 +68,13 @@ class TransportLayer:
         self.expected_seq_num = 0
 
     def log(self, message: str):
+        """Function for printing string-formatted Layer 4 log message"""
         print(f"{self.host_name}: Layer 4: {message}")
 
     def receive_from_application(self, data: bytes, src_ip: str, dest_ip: str):
         """Get application data, segment it into chunks of max 500 bytes, 
-        and transmit to the network layer using stop-and-wait"""
+        and transmit to the network layer using rdt2.2 stop-and-wait"""
+
         self.log(f"Data received from Application Layer. Data size={len(data)}")
 
         # Split data into 500-byte chunks
@@ -70,15 +95,12 @@ class TransportLayer:
 
                 self.send_segment(segment, src_ip, dest_ip)
 
-                # In our simulator, ACK handling occurs synchronously
-                # during nested method calls through the protocol stack.
-                # We didn't want to add any asynchronous timer ticks for simplicity
-
+                # Simplified implementation of ACK handling by nested method calls
                 if self.last_ack_received == segment.seq_num:
                     ack_received = True
                     self.waiting_for_ack = False
 
-                    # Alternate the sequence number between 0 and 1. Intuitive way via arithmetic.
+                    # Alternate the rdt2.2 sequence number between 0 and 1.
                     if self.seq_num == 0:
                         self.seq_num = 1
                     else:
@@ -90,14 +112,16 @@ class TransportLayer:
     def send_segment(self, segment: L4Segment, src_ip: str, dest_ip: str):
         """Compute checksum and forward segment to the network Layer"""
 
-        # Compute checksum for all segments
+        # First compute checksum before transmission
         segment.checksum = self.compute_checksum(segment.data)
         
         # Only log "Checksum computed" for DATA segments to match expected log
         if not segment.is_ack:
             self.log("Checksum computed")
 
-        segment_type = "ACK" if segment.is_ack else "DATA" #Host A, moving down is DATA. HostB will be ACK
+        #Host A, moving down is DATA. HostB will be ACK. 
+        # This is used for logging output
+        segment_type = "ACK" if segment.is_ack else "DATA" 
 
         encap_str = " (encapsulation)" if not segment.is_ack else ""
         self.log(f"Segment created by adding transport layer header ({segment_type}, seq={segment.seq_num}){encap_str}")
@@ -106,8 +130,10 @@ class TransportLayer:
         self.network_layer.receive_from_transport(segment, src_ip, dest_ip)
 
     def receive_from_network(self, segment: L4Segment, src_ip: str, dst_ip: str):
-        """Handle incoming segments using rdt2.2
-        Verifiy checksum and send to App or retransmit ACK if required"""
+        """Calculate checksum for incoming transport layer data segment.
+        Verify checksums, perform acknowledgements and detect duplicate transmission.
+        Valid data is sent to application layer.
+        """
 
         print()
         self.log("Segment received from Network Layer")
@@ -139,7 +165,7 @@ class TransportLayer:
             return
 
         # DATA Processing (Receiver Side)
-        # Correct Expected Segment
+        # Correct expected data segment recieved
         if segment.seq_num == self.expected_seq_num:
 
             self.log(f"DATA segment delivered to Application Layer. " f"Data size={len(segment.data)}")
@@ -154,7 +180,7 @@ class TransportLayer:
             else:
                 self.expected_seq_num = 0
 
-        # Incorrect, Duplicate Segment
+        # Incorrect, Duplicate data segment recieved
         else:
             self.log(f"Duplicate DATA segment received. " f"Expected seq={self.expected_seq_num}, " f"received seq={segment.seq_num}")
 
@@ -167,8 +193,8 @@ class TransportLayer:
             ack_segment = L4Segment(src_port=12345, dst_port=80, seq_num=previous_ack, is_ack=True, data=b"")
             self.send_segment(ack_segment, dst_ip, src_ip)
 
-    # Using standard Internet Checksum from week 8 lecture 
     def compute_checksum(self, data: bytes) -> int:
+        """Calculate standard Internet Checksum of data. Inspired from Week 8 lecture"""
         total = 0
 
         # Handle padding for an odd number of bytes
@@ -188,26 +214,33 @@ class TransportLayer:
         # 1's complement of the result
         return ~total & 0xFFFF
 
-    # Recalculate the checksum and compare it
     def verify_checksum(self, segment: L4Segment) -> bool:
+        """Recalculate the checksum and compare checksum for data integrity verification"""
         computed_checksum = self.compute_checksum(segment.data)
 
         return computed_checksum == segment.checksum
 
 class NetworkLayer:
-    """Layer 3: Handle IP routing, TTL, and forwarding"""
+    """Implementation of Network layer. This class is responsible for:
+    - Packet encapsulation
+    - Routing decisions
+    - Packet forwarding
+    - TTL handling
+    - Delivery between the transport and data-link layers
+    """
     def __init__(self, device_name: str, ips: dict, routing_table: dict, datalink_layer):
+        """Initialise network-layer addressing and routing information"""
         self.device_name = device_name
         self.ips = ips
         self.routing_table = routing_table
         self.datalink_layer = datalink_layer
-        self.transport_layer = None # Linked if device is a Host
+        self.transport_layer = None # Transport layer only present devices which are hosts
 
     def log(self, message: str):
         print(f"{self.device_name}: Layer 3: {message}")
 
     def receive_from_transport(self, segment: L4Segment, src_ip: str, dst_ip: str):
-        """Encapsulate segment into L3Packet and performs routing"""
+        """Encapsulate segment into network packet and perform routing"""
 
         print()
 
@@ -225,12 +258,12 @@ class NetworkLayer:
         self.log(f"Packet received from Data Link Layer: SRC_IP={packet.src_ip}, DST_IP={packet.dst_ip}, TTL={packet.ttl}")
         self.log(f"Destination IP read: {packet.dst_ip}")
 
-        # If this packet is for us, send it up
+        # If this packet is for us, send it up to transport layer
         if packet.dst_ip in self.ips.values():
             self.log(f"Packet identified as local delivery")
             self.log(f"Segment delivered to Transport Layer")
             self.transport_layer.receive_from_network(packet.payload, packet.src_ip, packet.dst_ip)
-        # Keep it goin and forward it to the next hop
+        # Forward packet to the next hop
         else:
             packet.ttl -= 1
 
@@ -243,7 +276,7 @@ class NetworkLayer:
             self._route_packet(packet)
 
     def _route_packet(self, packet: L3Packet):
-        """Look up dst_ip in routing_table and forward it to datalink layer"""
+        """Perform lookup in routing-table and forward the data packet to the data-link layer."""
 
         dest_ip = packet.dst_ip
 
@@ -265,22 +298,27 @@ class NetworkLayer:
         self.datalink_layer.receive_from_network(packet, next_hop_ip, interface)
 
 class DataLinkLayer:
-    """Layer 2: Handle MAC learning, framing, and physical forwarding"""
+    """Implementation of Data-link layer. This class is responsible for:
+    - Creation of data frame
+    - MAC address learning
+    - Local frame forwarding
+    - Delivery between the network layer and physical links
+    """
     def __init__(self, device_name: str, interfaces: dict, macs: dict, initial_mac_table: dict = None):
+        """Initialise interface mappings and MAC address tables"""
         self.device_name = device_name
         self.interfaces = interfaces # interface_id -> physical_link
         self.macs = macs                 # interface_id -> mac
-        self.mac_table = initial_mac_table if initial_mac_table else {} # next_hop_IP -> MAC 
+        self.mac_table = initial_mac_table if initial_mac_table else {} # Maps next-hop IPs to MAC addresses 
         self.network_layer = None
 
     def log(self, message: str):
         print(f"{self.device_name}: Layer 2: {message}")
 
     def receive_from_network(self, packet: L3Packet, next_hop_ip: str, interface: int):
-        """Look up destination MAC, create frame, and transmits on an interface"""
+        """Encapsulate packet into data frame, look up destination MAC address, create data frame, and transmit it across interface"""
 
         print()
-        
         self.log(f"Packet received from Network Layer")
 
         dst_mac = self.mac_table[next_hop_ip]
@@ -299,10 +337,10 @@ class DataLinkLayer:
         self.interfaces[interface].transmit(frame, self.device_name)
 
     def receive_from_physical(self, frame: L2Frame, interface: int):
-        """Learn source MAC, decapsulates, and delivers to network Layer"""
+        """Process an incoming data frame from the connection link. 
+        Learn source MAC address, decapsulate the data frame, and delivers packet to network layer"""
 
         print()
-        
         if "Router" in self.device_name:
             self.log(f"Frame received on Interface {interface}")
         else:

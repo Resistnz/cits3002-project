@@ -1,9 +1,21 @@
+"""
+main.py
+
+This script is the main entry file used to initialise computer network and function call. Responsible for:
+- Initialising components in computer network topology
+- Creating instances of hosts, routers and connection links
+- Processing command line input to send message
+- Calling an end-to-end transmission of message
+"""
 import sys
 import config
 from devices import Host, Router, Wire
 
 def setup_network():
-    """Initialise our hosts and wire them together"""
+    """Initialise components in our network topology. Initialise: 
+    - Hosts A and B
+    - Router R1
+    - Wire connection between devices in network"""
     host_a = Host("Host A", config.HOST_A_IP, config.HOST_A_MAC, config.HOST_A_ROUTING_TABLE, config.HOST_A_MAC_TABLE)
     host_b = Host("Host B", config.HOST_B_IP, config.HOST_B_MAC, config.HOST_B_ROUTING_TABLE, config.HOST_B_MAC_TABLE)
     
@@ -19,11 +31,14 @@ def setup_network():
     return host_a, router, host_b
 
 def main():
-    """Take command line input, set up the network and send a message"""
+    """Read the command line input, set up the network by calling setup_network() function above
+    and transmit a message from Host A to Host B"""
+    # Input sanitisation, user must message size argument
     if len(sys.argv) != 2:
         print("Usage: python main.py <message_size_in_bytes>")
         sys.exit(1)
-        
+
+    # Input message size is extracted from command line    
     try:
         message_size = int(sys.argv[1])
     except ValueError:
@@ -32,7 +47,8 @@ def main():
 
     host_a, router, host_b = setup_network()
     
-    # Make it so
+    # Begin an end-to-end message transmission
+    # Here we generate a 'dummy' application message of the specified size
     host_a.send_message(b"A" * message_size, config.HOST_B_IP)
 
 if __name__ == "__main__":
