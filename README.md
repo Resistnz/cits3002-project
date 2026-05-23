@@ -1,8 +1,6 @@
 # CITS3002, Mini Internet Protocol Stack Simulator (Python)
 ## Contributors
-24214277 - Tobias Camille
-
-24245674 - Kamlesh Senthilkumar
+24214277 - Tobias Camille, 24245674 - Kamlesh Senthilkumar
 
 ## File Structure
 ```text
