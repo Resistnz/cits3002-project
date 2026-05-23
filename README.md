@@ -16,7 +16,7 @@
 ```
 - Note: A documentation pdf (24214277-24245674.pdf) detailing design choices and justifications is located outside the code repository.
 
-### Project organisation:
+### Project organisation
 - main.py is the entry point for the simulator. 
 - protocol.py contains protocol layer and protocol data unit implementations. 
 - devices.py defines Hosts, Routers, and Wire connection links.
