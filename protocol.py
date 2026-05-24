@@ -25,6 +25,10 @@ class L4Segment:
         self.checksum = checksum
         self.length = len(self.data) + 8 # Size of transport-layer header
 
+    # combine the data and headers for checksum 
+    def combine_data(self):
+        return self.data + self.src_port.to_bytes(2, 'big') + self.dst_port.to_bytes(2, 'big') + self.seq_num.to_bytes(2, 'big') + self.is_ack.to_bytes(1, 'big')
+
 class L3Packet:
     """Network Layer (IP-like) Packet."""
     def __init__(self, src_ip: str, dst_ip: str, payload: L4Segment, ttl: int = 100):
@@ -113,7 +117,7 @@ class TransportLayer:
         """Compute checksum and forward segment to the network Layer"""
 
         # First compute checksum before transmission
-        segment.checksum = self.compute_checksum(segment.data)
+        segment.checksum = self.compute_checksum(segment.combine_data())
         
         # Only log "Checksum computed" for DATA segments to match expected log
         if not segment.is_ack:
@@ -216,7 +220,7 @@ class TransportLayer:
 
     def verify_checksum(self, segment: L4Segment) -> bool:
         """Recalculate the checksum and compare checksum for data integrity verification"""
-        computed_checksum = self.compute_checksum(segment.data)
+        computed_checksum = self.compute_checksum(segment.combine_data())
 
         return computed_checksum == segment.checksum
 
