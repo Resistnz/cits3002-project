@@ -38,7 +38,7 @@ def main():
         print("Usage: python main.py <message_size_in_bytes>")
         sys.exit(1)
 
-    # Input message size is extracted from command line    
+    # Input message size is extracted from command line. Only integer accepted.    
     try:
         message_size = int(sys.argv[1])
     except ValueError:
